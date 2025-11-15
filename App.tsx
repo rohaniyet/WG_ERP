@@ -47,11 +47,29 @@ const App: React.FC = () => {
       id: `PO${(purchaseOrders.length + 1).toString().padStart(3, '0')}`,
     }
     setPurchaseOrders(prev => [...prev, newOrder]);
-    // Increase stock of raw material
-    setRawMaterials(prev => prev.map(rm => 
-      rm.id === newOrder.materialId ? { ...rm, stock: rm.stock + newOrder.quantity } : rm
-    ));
+    // Stock is now only increased when status is updated to 'Completed'
   };
+
+  const handleUpdatePurchaseStatus = (orderId: string, status: OrderStatus) => {
+    const order = purchaseOrders.find(o => o.id === orderId);
+    if (!order) return;
+
+    const oldStatus = order.status;
+    
+    // Update stock based on status change
+    if (oldStatus !== 'Completed' && status === 'Completed') {
+      setRawMaterials(prevRms => prevRms.map(rm =>
+        rm.id === order.materialId ? { ...rm, stock: rm.stock + order.quantity } : rm
+      ));
+    } else if (oldStatus === 'Completed' && status !== 'Completed') {
+      setRawMaterials(prevRms => prevRms.map(rm =>
+        rm.id === order.materialId ? { ...rm, stock: rm.stock - order.quantity } : rm
+      ));
+    }
+
+    setPurchaseOrders(prevOrders => prevOrders.map(o => o.id === orderId ? { ...o, status } : o));
+  };
+
 
   const handleAddSale = (sale: Omit<Sale, 'id'>) => {
     const newSale: Sale = {
@@ -154,6 +172,7 @@ const App: React.FC = () => {
             distributors={distributors} 
             addSupplier={handleAddSupplier}
             addRawMaterial={handleAddRawMaterial}
+            handleUpdatePurchaseStatus={handleUpdatePurchaseStatus}
         />;
       case 'PRODUCTION':
         return <Production 

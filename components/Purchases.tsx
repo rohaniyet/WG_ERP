@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { PurchaseOrder, RawMaterial, Supplier, FinishedProduct, Distributor } from '../types';
+import type { PurchaseOrder, RawMaterial, Supplier, FinishedProduct, Distributor, OrderStatus } from '../types';
 import { Table } from './ui/Table';
 import { Modal } from './ui/Modal';
 import { PrintableInvoice } from './PrintableInvoice';
@@ -15,6 +15,7 @@ interface PurchasesProps {
     distributors: Distributor[];
     addSupplier: (name: string) => Supplier;
     addRawMaterial: (material: Omit<RawMaterial, 'id' | 'stock'>) => RawMaterial;
+    handleUpdatePurchaseStatus: (orderId: string, status: OrderStatus) => void;
 }
 
 const emptyOrder = {
@@ -24,7 +25,7 @@ const emptyOrder = {
   supplierId: ''
 };
 
-export const Purchases: React.FC<PurchasesProps> = ({ purchaseOrders, addPurchaseOrder, rawMaterials, suppliers, finishedProducts, distributors, addSupplier, addRawMaterial }) => {
+export const Purchases: React.FC<PurchasesProps> = ({ purchaseOrders, addPurchaseOrder, rawMaterials, suppliers, finishedProducts, distributors, addSupplier, addRawMaterial, handleUpdatePurchaseStatus }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
@@ -35,6 +36,9 @@ export const Purchases: React.FC<PurchasesProps> = ({ purchaseOrders, addPurchas
 
   const [isAddMaterialOpen, setAddMaterialOpen] = useState(false);
   const [newMaterial, setNewMaterial] = useState({ name: '', unit: 'kg' as RawMaterial['unit'], costPerUnit: '' });
+  
+  const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (rawMaterials.length > 0 && !newOrder.materialId) {
@@ -138,8 +142,34 @@ export const Purchases: React.FC<PurchasesProps> = ({ purchaseOrders, addPurchas
     { header: 'Order Date', accessor: 'orderDate' as keyof PurchaseOrder },
     { header: 'Status', accessor: (item: PurchaseOrder) => statusBadge(item.status) },
     { header: 'Actions', accessor: (item: PurchaseOrder) => (
-        <button onClick={() => handlePrintClick(item)} className="text-indigo-600 hover:text-indigo-900"><PrintIcon /></button>
-    )},
+      <div className="relative">
+          <button onClick={() => setOpenActionMenu(openActionMenu === item.id ? null : item.id)} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+              </svg>
+          </button>
+          {openActionMenu === item.id && (
+              <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-20" onMouseLeave={() => setOpenActionMenu(null)}>
+                  <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                      <button onClick={() => { handlePrintClick(item); setOpenActionMenu(null); }} className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                          <PrintIcon className="mr-3 h-5 w-5 text-gray-400"/>
+                          <span>Print Invoice</span>
+                      </button>
+                      {item.status === 'Pending' && (
+                          <button onClick={() => { handleUpdatePurchaseStatus(item.id, 'Completed'); setOpenActionMenu(null); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                              Mark as Completed
+                          </button>
+                      )}
+                      {item.status === 'Completed' && (
+                          <button onClick={() => { handleUpdatePurchaseStatus(item.id, 'Pending'); setOpenActionMenu(null); }} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem">
+                              Mark as Pending
+                          </button>
+                      )}
+                  </div>
+              </div>
+          )}
+      </div>
+  )},
   ];
 
   const totalAmount = (Number(newOrder.quantity) * Number(newOrder.rate)).toLocaleString();
